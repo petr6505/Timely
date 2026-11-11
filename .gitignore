@@ -1,0 +1,14 @@
+# build outputs
+dist/
+**/build/
+.dart_tool/
+**/.dart_tool/
+**/.flutter-plugins*
+**/ephemeral/
+backend/node_modules/
+backend/.wrangler/
+# secrets
+app/android/key.properties
+app/android/app/*.jks
+*.keystore
+.dev.vars

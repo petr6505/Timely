@@ -1,0 +1,106 @@
+# Builds the Android APKs, the Linux .deb and the Windows installer and attaches
+# them to a GitHub release when a tag like v1.0.0 is pushed.
+#
+# Optional repository settings (Settings > Secrets and variables > Actions):
+#   variable TIMELY_SERVER         backend URL prefilled on the login screen
+#   secret   ANDROID_KEYSTORE_B64  base64 of a release keystore; without it the
+#   secret   ANDROID_KEYSTORE_PASS   APK is signed with the debug key
+#   secret   ANDROID_KEY_ALIAS
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_CHANNEL: stable
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    env:
+      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_B64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable, cache: true }
+      - name: keystore
+        if: env.HAS_KEYSTORE == 'true'
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          echo "$KS" | base64 -d > app/android/app/release.jks
+          printf 'storeFile=release.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' "$PASS" "$ALIAS" "$PASS" > app/android/key.properties
+      - working-directory: app
+        run: flutter build apk --release --split-per-abi --dart-define=TIMELY_SERVER=${{ vars.TIMELY_SERVER }}
+      - run: |
+          mkdir -p dist
+          # arm64 covers every phone from the last ~8 years; armv7 for old devices
+          cp app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk dist/timely-${GITHUB_REF_NAME}-arm64.apk
+          cp app/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk dist/timely-${GITHUB_REF_NAME}-armv7.apk
+      - uses: actions/upload-artifact@v4
+        with: { name: android, path: dist/* }
+
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable, cache: true }
+      - working-directory: app
+        run: flutter build linux --release --dart-define=TIMELY_SERVER=${{ vars.TIMELY_SERVER }}
+      - working-directory: agent
+        run: dart pub get && mkdir -p build && dart compile exe bin/timely_agent.dart -o build/timely-agent
+      - run: packaging/linux/build-deb.sh "${GITHUB_REF_NAME#v}"
+      - uses: actions/upload-artifact@v4
+        with: { name: linux, path: dist/*.deb }
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable, cache: true }
+      - working-directory: app
+        run: flutter build windows --release --dart-define=TIMELY_SERVER=${{ vars.TIMELY_SERVER }}
+      - working-directory: agent
+        shell: pwsh
+        run: |
+          dart pub get
+          New-Item -ItemType Directory -Force build | Out-Null
+          dart compile exe bin/timely_agent.dart -o build/timely-agent.exe
+      - name: make agent a windowless (GUI-subsystem) exe
+        shell: pwsh
+        run: |
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+          $editbin = Get-ChildItem "$vs\VC\Tools\MSVC" -Recurse -Filter editbin.exe | Where-Object { $_.FullName -match 'Hostx64\\x64' } | Select-Object -First 1
+          & $editbin.FullName /SUBSYSTEM:WINDOWS agent\build\timely-agent.exe
+      - name: installer
+        shell: pwsh
+        run: |
+          $env:TIMELY_VERSION = "${env:GITHUB_REF_NAME}".TrimStart('v')
+          choco install innosetup -y --no-progress
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" packaging\windows\timely.iss
+      - uses: actions/upload-artifact@v4
+        with: { name: windows, path: dist/*.exe }
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [android, linux, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: dist, merge-multiple: true }
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

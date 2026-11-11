@@ -1,0 +1,7 @@
+{
+  "uuid": "timely-focus@timely.dev",
+  "name": "Timely focus",
+  "description": "Lets the Timely agent see which app is focused (Wayland hides this from normal apps). Exposes only app id/name, idle time and lock state on the session bus. Window titles are never exposed.",
+  "shell-version": ["45", "46", "47", "48", "49", "50", "51"],
+  "url": "https://github.com/"
+}

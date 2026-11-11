@@ -1,0 +1,14 @@
+name: timely_core
+description: Shared data model, compression codec, API client and aggregation for Timely.
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  http: ^1.2.0
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.6

@@ -1,0 +1,16 @@
+[Unit]
+Description=Timely screen time agent
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+ExecStart=/usr/lib/timely/timely-agent
+Restart=always
+RestartSec=10
+# hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+PrivateTmp=yes
+
+[Install]
+WantedBy=graphical-session.target

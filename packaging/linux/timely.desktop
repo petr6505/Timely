@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Timely
+Comment=Screen time across all your devices
+Exec=/usr/lib/timely/timely %U
+Icon=timely
+Terminal=false
+Categories=Utility;
+MimeType=x-scheme-handler/timely;
+StartupWMClass=dev.timely.timely

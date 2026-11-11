@@ -1,0 +1,35 @@
+name: timely
+description: "Timely — screen time across all your devices."
+publish_to: 'none'
+version: 1.0.0+3
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  timely_core:
+    path: ../packages/timely_core
+  shared_preferences: ^2.3.0
+  path_provider: ^2.1.0
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^7.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  fonts:
+    - family: JetBrainsMono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-Regular.ttf
+        - asset: assets/fonts/JetBrainsMono-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/JetBrainsMono-Bold.ttf
+          weight: 700
