@@ -8,9 +8,9 @@ import '../native.dart';
 import '../state.dart';
 import '../widgets/common.dart';
 
-// Can be overridden at build time with --dart-define=TIMELY_SERVER=https://...
-const _serverOverride = String.fromEnvironment('TIMELY_SERVER');
-const defaultServer = _serverOverride == '' ? 'https://timely.example.workers.dev' : _serverOverride;
+// Prefilled server address, set at build time with --dart-define=TIMELY_SERVER=https://...
+// Pairing links and QR codes carry the server, so most devices never need to type it.
+const defaultServer = String.fromEnvironment('TIMELY_SERVER');
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});

@@ -92,7 +92,7 @@ class SettingsScreen extends StatelessWidget {
         ),
       ]),
       const SizedBox(height: 24),
-      Mono('timely 1.0.0', size: 10, color: p.muted),
+      Mono('timely 1.1.0', size: 10, color: p.muted),
     ]);
   }
 

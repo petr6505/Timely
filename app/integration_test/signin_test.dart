@@ -1,6 +1,6 @@
 // Sign out from settings, then sign back in with email + password.
 // flutter test integration_test/signin_test.dart -d linux \
-//   --dart-define=EMAIL=... --dart-define=PASSWORD=...
+//   --dart-define=SERVER=https://... --dart-define=EMAIL=... --dart-define=PASSWORD=...
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -10,7 +10,7 @@ import 'package:timely_core/timely_core.dart';
 
 const email = String.fromEnvironment('EMAIL');
 const password = String.fromEnvironment('PASSWORD');
-const server = String.fromEnvironment('SERVER', defaultValue: 'https://timely.example.workers.dev');
+const server = String.fromEnvironment('SERVER');
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();

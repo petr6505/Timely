@@ -6,6 +6,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:timely_core/timely_core.dart';
 
 import '../native.dart';
+import '../state.dart';
 import '../widgets/common.dart';
 
 class DevicesScreen extends StatefulWidget {
@@ -110,8 +111,65 @@ class _DevicesScreenState extends State<DevicesScreen> {
           ),
         const SizedBox(height: 20),
         FilledButton(onPressed: () => _addDevice(context), child: const Text('+ add device')),
+        if (st.removedDevices.isNotEmpty) ...[
+          const SectionLabel('removed devices'),
+          Mono('history of devices that are no longer in your account. hide it from the statistics or delete it.',
+              size: 11, color: p.muted, wrap: true),
+          const SizedBox(height: 8),
+          for (final r in st.removedDevices) _removedRow(context, r),
+        ],
       ],
     );
+  }
+
+  Widget _removedRow(BuildContext context, RemovedDevice r) {
+    final st = AppScope.of(context);
+    final p = PaletteScope.of(context);
+    final hidden = st.settings.hiddenDevices.contains(r.id);
+    String day(String d) {
+      final t = DateTime.parse(d);
+      return '${t.day}.${t.month}.${t.year % 100}';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(children: [
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Mono(hidden ? 'removed device (hidden)' : 'removed device', color: hidden ? p.muted : null),
+            Mono('${day(r.firstDay)} - ${day(r.lastDay)} · ${fmtDur(r.focus)}', size: 11, color: p.muted),
+          ]),
+        ),
+        TextButton(
+          onPressed: () => st.setDeviceHidden(r.id, !hidden),
+          child: Text(hidden ? 'show' : 'hide'),
+        ),
+        TextButton(
+          onPressed: () => _deleteHistory(context, r),
+          child: const Text('delete', style: TextStyle(color: Color(0xFFE5735C))),
+        ),
+      ]),
+    );
+  }
+
+  Future<void> _deleteHistory(BuildContext context, RemovedDevice r) async {
+    final st = AppScope.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        content: Mono('permanently delete ${fmtDur(r.focus)} of history from this removed device?', size: 12, wrap: true),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('delete')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await st.deleteDeviceHistory(r.id);
+    } catch (e) {
+      if (context.mounted) toast(context, e.toString());
+    }
   }
 
   Future<void> _manage(BuildContext context, RemoteDevice d) async {

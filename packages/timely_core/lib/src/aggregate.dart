@@ -72,6 +72,7 @@ Summary summarize(Map<String, Map<String, DayChunk>> chunks, TimelySettings s, F
   sum.days.addAll(dayStats.values);
 
   chunks.forEach((deviceId, byDay) {
+    if (s.hiddenDevices.contains(deviceId)) return;
     if (f.devices.isNotEmpty && !f.devices.contains(deviceId)) return;
     byDay.forEach((day, c) {
       final ds = dayStats[day];

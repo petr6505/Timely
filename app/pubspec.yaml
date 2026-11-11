@@ -1,7 +1,7 @@
 name: timely
 description: "Timely — screen time across all your devices."
 publish_to: 'none'
-version: 1.0.0+3
+version: 1.1.0+4
 
 environment:
   sdk: ^3.8.0

@@ -10,6 +10,7 @@ class TimelySettings {
   Map<String, String> appCategory; // mergeKey -> category id
   Map<String, String> aliases; // mergeKey -> canonical mergeKey
   Set<String> removedCategories; // default categories the user deleted
+  Set<String> hiddenDevices; // device ids left out of all statistics
   int idleMinutes;
 
   TimelySettings({
@@ -21,11 +22,13 @@ class TimelySettings {
     Map<String, String>? appCategory,
     Map<String, String>? aliases,
     Set<String>? removedCategories,
+    Set<String>? hiddenDevices,
     this.idleMinutes = 3,
   })  : categories = categories ?? [...defaultCategories],
         appCategory = appCategory ?? {},
         aliases = aliases ?? {},
-        removedCategories = removedCategories ?? {} {
+        removedCategories = removedCategories ?? {},
+        hiddenDevices = hiddenDevices ?? {} {
     _addMissingDefaults();
   }
 
@@ -72,6 +75,7 @@ class TimelySettings {
         'appCategory': appCategory,
         'aliases': aliases,
         'removedCategories': removedCategories.toList(),
+        'hiddenDevices': hiddenDevices.toList(),
         'idleMinutes': idleMinutes,
       };
 
@@ -94,6 +98,7 @@ class TimelySettings {
       appCategory: (j['appCategory'] as Map?)?.cast<String, String>(),
       aliases: (j['aliases'] as Map?)?.cast<String, String>(),
       removedCategories: (j['removedCategories'] as List?)?.cast<String>().toSet(),
+      hiddenDevices: (j['hiddenDevices'] as List?)?.cast<String>().toSet(),
       idleMinutes: (j['idleMinutes'] as num?)?.toInt() ?? d.idleMinutes,
     );
   }

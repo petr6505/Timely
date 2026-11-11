@@ -191,11 +191,17 @@ async function patchDevice(req, env, a, id) {
   return json({ ok: true });
 }
 
+// With ?purge=1 this also deletes the device's history. That works for devices
+// that were already removed too, so leftover data can be cleaned up.
 async function deleteDevice(req, env, a, id) {
   const purge = new URL(req.url).searchParams.get('purge') === '1';
   const r = await env.DB.prepare('DELETE FROM devices WHERE id = ? AND user_id = ?').bind(id, a.userId).run();
-  if (!r.meta.changes) fail(404, 'not found');
-  if (purge) await env.DB.prepare('DELETE FROM chunks WHERE device_id = ? AND user_id = ?').bind(id, a.userId).run();
+  let purged = 0;
+  if (purge) {
+    const c = await env.DB.prepare('DELETE FROM chunks WHERE device_id = ? AND user_id = ?').bind(id, a.userId).run();
+    purged = c.meta.changes;
+  }
+  if (!r.meta.changes && !purged) fail(404, 'not found');
   return json({ ok: true });
 }
 

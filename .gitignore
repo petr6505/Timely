@@ -12,3 +12,6 @@ app/android/key.properties
 app/android/app/*.jks
 *.keystore
 .dev.vars
+
+# your deployment config (copy of wrangler.example.toml with real ids)
+backend/wrangler.toml

@@ -96,4 +96,21 @@ void main() {
     final o = summarize({'pc': {'2026-11-09': pc}}, s, const Filter(fromDay: '2026-11-09', toDay: '2026-11-09'));
     expect(o.categories['productivity'], 300);
   });
+
+  test('hidden devices are left out of statistics', () {
+    final a = DayChunk(day: '2026-11-09', tzOffsetMin: 0);
+    a.focused.add(Session(a.appIndex('x', 'X'), 0, 600));
+    final b = DayChunk(day: '2026-11-09', tzOffsetMin: 0);
+    b.focused.add(Session(b.appIndex('x', 'X'), 0, 300));
+    final chunks = {'live': {'2026-11-09': a}, 'old': {'2026-11-09': b}};
+    const f = Filter(fromDay: '2026-11-09', toDay: '2026-11-09');
+    final s = TimelySettings();
+    expect(summarize(chunks, s, f).focus, 900);
+    s.hiddenDevices.add('old');
+    final sum = summarize(chunks, s, f);
+    expect(sum.focus, 600);
+    expect(sum.apps['x']!.perDevice.keys, ['live']);
+    // survives a settings round trip (synced between devices)
+    expect(TimelySettings.fromJson(s.toJson()).hiddenDevices, {'old'});
+  });
 }

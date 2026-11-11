@@ -231,6 +231,38 @@ class AppState extends ChangeNotifier {
     _settingsTimer = Timer(const Duration(milliseconds: 800), _pushSettings);
   }
 
+  /// Devices that were removed from the account but still have history here.
+  List<RemovedDevice> get removedDevices {
+    if (devices.isEmpty) return const []; // device list not loaded yet
+    final known = {for (final d in devices) d.id};
+    final out = <RemovedDevice>[];
+    chunks.forEach((id, byDay) {
+      if (known.contains(id) || byDay.isEmpty) return;
+      final days = byDay.keys.toList()..sort();
+      var focus = 0;
+      for (final c in byDay.values) {
+        for (var i = 0; i < c.apps.length; i++) {
+          focus += c.hourly(i).fold(0, (a, b) => a + b);
+        }
+      }
+      out.add(RemovedDevice(id, days.first, days.last, focus));
+    });
+    return out..sort((a, b) => b.lastDay.compareTo(a.lastDay));
+  }
+
+  void setDeviceHidden(String id, bool hidden) =>
+      updateSettings((s) => hidden ? s.hiddenDevices.add(id) : s.hiddenDevices.remove(id));
+
+  /// Permanently deletes the history of a removed device from the server.
+  Future<void> deleteDeviceHistory(String id) async {
+    await api.removeDevice(id, purge: true);
+    chunks.remove(id);
+    final d = Directory('${_cacheDir.path}/$id');
+    if (d.existsSync()) d.deleteSync(recursive: true);
+    if (settings.hiddenDevices.contains(id)) setDeviceHidden(id, false);
+    notifyListeners();
+  }
+
   String deviceName(String id) =>
       devices.where((d) => d.id == id).map((d) => d.name).firstOrNull ?? 'removed device';
 
@@ -256,4 +288,12 @@ class AppState extends ChangeNotifier {
     _settingsTimer?.cancel();
     super.dispose();
   }
+}
+
+class RemovedDevice {
+  final String id;
+  final String firstDay;
+  final String lastDay;
+  final int focus;
+  const RemovedDevice(this.id, this.firstDay, this.lastDay, this.focus);
 }

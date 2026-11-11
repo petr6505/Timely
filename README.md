@@ -79,12 +79,13 @@ The backend fits comfortably in Cloudflare's free plan, with no credit card and 
 cd backend
 npm install
 npx wrangler login
+cp wrangler.example.toml wrangler.toml
 npx wrangler d1 create timely        # put the printed database_id into wrangler.toml
 npm run db:init
 npx wrangler deploy
 ```
 
-Then point the app at your worker URL on the login screen, or bake it in at build time with `--dart-define=TIMELY_SERVER=https://...`.
+Enter the worker URL on the first device's login screen. Devices added by QR code or pairing link get it automatically. To have it prefilled in your own builds, pass `--dart-define=TIMELY_SERVER=https://...` to `flutter build`, or set the `TIMELY_SERVER` repository variable for the GitHub Actions builds.
 
 ## Building from source
 
@@ -139,7 +140,7 @@ cd packages/timely_core && dart test
 
 # end-to-end UI tests against a running backend
 cd app && flutter test integration_test/e2e_test.dart -d linux \
-  --dart-define=PAIR_CODE=XXXX-XXXX --dart-define=SHOT_DIR=/tmp/shots
+  --dart-define=SERVER=https://... --dart-define=PAIR_CODE=XXXX-XXXX --dart-define=SHOT_DIR=/tmp/shots
 ```
 
 For local development, run the backend with `npx wrangler dev` and on Android use `adb reverse tcp:8787 tcp:8787`. Plain HTTP is only accepted for `localhost`.
