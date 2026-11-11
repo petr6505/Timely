@@ -14,6 +14,7 @@ import 'package:timely_core/timely_core.dart';
 
 const pairCode = String.fromEnvironment('PAIR_CODE');
 const shotDir = String.fromEnvironment('SHOT_DIR', defaultValue: '/tmp/timely-shots');
+const server = String.fromEnvironment('SERVER');
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -66,8 +67,9 @@ void main() {
     await wait(t, 1);
     await shot(t, '01-auth');
 
-    // ---- pair with one-time code ----
+    // pair with one-time code
     expect(find.text('add this device'), findsOneWidget);
+    if (server.isNotEmpty) await t.enterText(find.widgetWithText(TextField, 'server'), server);
     await t.enterText(find.widgetWithText(TextField, 'pairing code or link'), pairCode);
     await t.tap(find.widgetWithText(FilledButton, 'pair'));
     await waitFor(t, () => state.signedIn && !state.syncing && state.lastRefresh != null);
@@ -75,7 +77,7 @@ void main() {
     expect(state.devices.any((d) => d.platform == 'android'), isTrue, reason: 'phone visible to laptop');
     await shot(t, '02-dash-7d');
 
-    // ---- dashboard interactions ----
+    // dashboard interactions
     await tapText(t, '30d');
     await shot(t, '03-dash-30d');
     await tapText(t, 'day');
@@ -94,7 +96,7 @@ void main() {
     expect(find.textContaining('category:'), findsOneWidget);
     await shot(t, '06-dash-app-expanded');
 
-    // ---- devices ----
+    // devices
     await tapText(t, 'devices');
     expect(find.text(phone.name), findsWidgets);
     await shot(t, '07-devices');
@@ -105,7 +107,7 @@ void main() {
     await t.tap(find.widgetWithText(FilledButton, 'done'));
     await wait(t, 1);
 
-    // ---- settings: theme preset syncs to server ----
+    // settings: theme preset syncs to server
     await tapText(t, 'settings');
     await shot(t, '09-settings');
     await tapText(t, 'amber');
@@ -114,7 +116,7 @@ void main() {
     expect(TimelySettings.fromJson(remote).accent, TimelySettings.presets['amber']![2]);
     expect(TimelySettings.fromJson(remote).fg, TimelySettings.presets['amber']![1]);
 
-    // ---- settings: category colour edit syncs ----
+    // settings: category colour edit syncs
     await tapText(t, 'navigation');
     await t.tap(find.byWidgetPredicate((w) =>
         w is Container && w.decoration is BoxDecoration &&

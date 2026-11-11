@@ -41,12 +41,19 @@ jobs:
           printf 'storeFile=release.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' "$PASS" "$ALIAS" "$PASS" > app/android/key.properties
       - working-directory: app
         run: flutter build apk --release --split-per-abi --dart-define=TIMELY_SERVER=${{ vars.TIMELY_SERVER }}
-      - run: |
+      # Only publish APKs signed with the release key. A debug-signed APK can't be
+      # installed over a previous release, so without the secrets the APKs are
+      # built (to catch errors) but not attached to the release.
+      - if: env.HAS_KEYSTORE != 'true'
+        run: echo "::warning::ANDROID_KEYSTORE_* secrets not set, APKs will not be published"
+      - if: env.HAS_KEYSTORE == 'true'
+        run: |
           mkdir -p dist
           # arm64 covers every phone from the last ~8 years; armv7 for old devices
           cp app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk dist/timely-${GITHUB_REF_NAME}-arm64.apk
           cp app/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk dist/timely-${GITHUB_REF_NAME}-armv7.apk
-      - uses: actions/upload-artifact@v4
+      - if: env.HAS_KEYSTORE == 'true'
+        uses: actions/upload-artifact@v4
         with: { name: android, path: dist/* }
 
   linux:

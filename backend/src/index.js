@@ -89,10 +89,19 @@ async function rateLimit(env, key, max, windowMs) {
   await env.DB.prepare('UPDATE rate_limits SET count = count + 1 WHERE key = ?').bind(key).run();
 }
 
+// Signing in again from the same device (same name and platform, e.g. after a
+// reinstall) reuses its id and only issues a new token, so history continues.
 async function createDevice(env, userId, name, platform) {
   const token = randomToken();
-  const id = crypto.randomUUID();
   const now = Date.now();
+  const existing = await env.DB.prepare('SELECT id FROM devices WHERE user_id = ? AND name = ? AND platform = ?')
+    .bind(userId, name, platform).first();
+  if (existing) {
+    await env.DB.prepare('UPDATE devices SET token_hash = ?, last_seen = ? WHERE id = ?')
+      .bind(await sha256(token), now, existing.id).run();
+    return { token, deviceId: existing.id };
+  }
+  const id = crypto.randomUUID();
   await env.DB.prepare(
     'INSERT INTO devices (id, user_id, name, platform, token_hash, created_at, last_seen) VALUES (?, ?, ?, ?, ?, ?, ?)'
   ).bind(id, userId, name, platform, await sha256(token), now, now).run();
@@ -342,7 +351,9 @@ async function route(req, env) {
   if (m === 'GET' && p === '/v1/settings') return getSettings(env, a);
   if (m === 'PUT' && p === '/v1/settings') return putSettings(req, env, a);
   if (m === 'POST' && p === '/v1/logout') {
-    await env.DB.prepare('DELETE FROM devices WHERE id = ?').bind(a.deviceId).run();
+    // revoke the token but keep the device so its history stays attached
+    await env.DB.prepare('UPDATE devices SET token_hash = ? WHERE id = ?')
+      .bind(await sha256(randomToken()), a.deviceId).run();
     return json({ ok: true });
   }
   if (m === 'POST' && p === '/v1/account/delete') return deleteAccount(req, env, a);

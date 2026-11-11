@@ -31,6 +31,7 @@ void main() {
     }
     expect(state.signedIn, isTrue);
     final oldId = state.creds!.deviceId;
+    final oldToken = state.creds!.token;
     await t.pumpWidget(TimelyApp(state: state));
     await wait(t, 2);
 
@@ -69,7 +70,8 @@ void main() {
       await wait(t, 0.3);
     }
     expect(state.signedIn, isTrue);
-    expect(state.creds!.deviceId, isNot(oldId), reason: 'new device token issued');
+    expect(state.creds!.deviceId, oldId, reason: 'same computer keeps its device and history');
+    expect(state.creds!.token, isNot(oldToken), reason: 'fresh token issued');
     expect(DesktopPaths.readCredentials()?.token, state.creds!.token, reason: 'agent gets new token');
     expect(state.chunks.isNotEmpty, isTrue, reason: 'history visible after sign-in');
     await wait(t, 1);

@@ -55,6 +55,8 @@ Grab the latest packages from [Releases](../../releases).
 
 The app shows a checklist under *devices*.
 
+If Android says *App not installed* when updating, the installed copy was signed with a different key (builds from before the first release were). Uninstall it once and install again. If you sign back in with the same account, your history is still there.
+
 **Ubuntu / GNOME:**
 
 ```sh
@@ -99,6 +101,36 @@ cd app && flutter build apk --release --split-per-abi
 ```
 
 Windows builds have to run on Windows, so the GitHub Actions workflow in `.github/workflows/release.yml` handles them. Pushing a `v*` tag builds all three platforms and attaches the packages to a release.
+
+### Android signing
+
+Android only installs an update if it's signed with the same key as the installed app, so release APKs must always be signed with the same release key. Create it once:
+
+```sh
+keytool -genkeypair -keystore timely-release.jks -storetype PKCS12 -alias timely \
+  -keyalg RSA -keysize 4096 -validity 10000
+```
+
+Keep the `.jks` file and its password somewhere safe and outside the repo. If you lose them, existing installs can't be updated anymore and have to be uninstalled first.
+
+**Local builds:** create `app/android/key.properties` (it's git-ignored):
+
+```
+storeFile=/absolute/path/to/timely-release.jks
+storePassword=...
+keyAlias=timely
+keyPassword=...
+```
+
+**GitHub Actions:** add these repository secrets:
+
+| Secret | Value |
+|---|---|
+| `ANDROID_KEYSTORE_B64` | Output of `base64 -w0 timely-release.jks` |
+| `ANDROID_KEYSTORE_PASS` | The keystore password |
+| `ANDROID_KEY_ALIAS` | `timely` |
+
+Without the secrets the workflow still builds the APKs but doesn't publish them, because a debug-signed APK can't be installed over a release.
 
 ### Tests
 

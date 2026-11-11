@@ -133,6 +133,8 @@ class AppState extends ChangeNotifier {
     _cursor = 0;
     devices = [];
     chunks.clear();
+    lastRefresh = null;
+    syncError = null;
     if (_cacheDir.existsSync()) _cacheDir.deleteSync(recursive: true);
     _cacheDir.createSync(recursive: true);
     notifyListeners();
