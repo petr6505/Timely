@@ -113,4 +113,59 @@ void main() {
     // survives a settings round trip (synced between devices)
     expect(TimelySettings.fromJson(s.toJson()).hiddenDevices, {'old'});
   });
+
+  group('linked and renamed apps', () {
+    const f = Filter(fromDay: '2026-11-09', toDay: '2026-11-09');
+    late Map<String, Map<String, DayChunk>> chunks;
+
+    setUp(() {
+      final phone = DayChunk(day: '2026-11-09', tzOffsetMin: 0);
+      phone.focused.add(Session(phone.appIndex('com.brave.browser', 'Brave'), 0, 600));
+      final laptop = DayChunk(day: '2026-11-09', tzOffsetMin: 0);
+      laptop.focused.add(Session(laptop.appIndex('brave-browser', 'Brave Web Browser'), 0, 300));
+      laptop.focused.add(Session(laptop.appIndex('code', 'Code'), 600, 100));
+      chunks = {'phone': {'2026-11-09': phone}, 'laptop': {'2026-11-09': laptop}};
+    });
+
+    test('linking counts both as one app', () {
+      final s = TimelySettings();
+      expect(summarize(chunks, s, f).apps.keys, containsAll(['brave', 'bravewebbrowser']));
+      s.linkApp('bravewebbrowser', 'brave', ['bravewebbrowser']);
+      final brave = summarize(chunks, s, f).apps['brave']!;
+      expect(brave.focus, 900);
+      expect(brave.name, 'Brave');
+      expect(brave.members.keys, unorderedEquals(['brave', 'bravewebbrowser']));
+      expect(brave.perDevice['laptop']!.names, {'Brave Web Browser'});
+      expect(summarize(chunks, s, f).apps.containsKey('bravewebbrowser'), isFalse);
+
+      s.unlinkApp('bravewebbrowser');
+      expect(summarize(chunks, s, f).apps['brave']!.focus, 600);
+    });
+
+    test('linking an app that already has links moves them along', () {
+      final s = TimelySettings();
+      s.linkApp('bravewebbrowser', 'brave', ['bravewebbrowser']);
+      s.linkApp('brave', 'vscode', ['brave', 'bravewebbrowser']);
+      final sum = summarize(chunks, s, f);
+      expect(sum.apps.keys, ['vscode']);
+      expect(sum.apps['vscode']!.focus, 1000);
+    });
+
+    test('custom names survive a settings round trip', () {
+      final s = TimelySettings()..renameApp('vscode', '  VS Code ');
+      final back = TimelySettings.fromJson(s.toJson());
+      expect(summarize(chunks, back, f).apps['vscode']!.name, 'VS Code');
+      expect(knownApps(chunks, back)['vscode'], 'VS Code');
+      back.renameApp('vscode', '');
+      expect(summarize(chunks, back, f).apps['vscode']!.name, 'Code');
+    });
+
+    test('linked app keeps the category of the app it was linked into', () {
+      final s = TimelySettings();
+      s.appCategory['brave'] = 'productivity';
+      s.appCategory['bravewebbrowser'] = 'games';
+      s.linkApp('bravewebbrowser', 'brave', ['bravewebbrowser']);
+      expect(summarize(chunks, s, f).categories['productivity'], 900);
+    });
+  });
 }

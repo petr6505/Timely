@@ -9,11 +9,6 @@ import 'probe.dart';
 /// background audio via Core Audio session state.
 class WindowsProbe extends Probe {
   final Map<String, String> _names = {};
-  IAudioSessionManager2? _audio;
-
-  WindowsProbe() {
-    CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-  }
 
   @override
   String get source => 'win32';
@@ -32,9 +27,8 @@ class WindowsProbe extends Probe {
     }
     if (path == null) return FocusInfo('', '', idle, false);
     final exe = path.split('\\').last;
-    final lower = exe.toLowerCase();
-    final locked = lower == 'lockapp.exe' || lower == 'logonui.exe';
-    final id = lower.endsWith('.exe') ? lower.substring(0, lower.length - 4) : lower;
+    final id = _appId(exe);
+    final locked = id == 'lockapp' || id == 'logonui';
     return FocusInfo(id, _names[path] ??= _displayName(path, exe), idle, locked);
   }
 
@@ -98,106 +92,106 @@ class WindowsProbe extends Probe {
   }
 
   /// FileDescription from the exe's version resource, e.g. "Google Chrome".
-  String _displayName(String path, String exe) {
-    final fallback = exe.toLowerCase().endsWith('.exe') ? exe.substring(0, exe.length - 4) : exe;
-    final p = path.toNativeUtf16();
-    try {
-      final size = GetFileVersionInfoSize(p, nullptr);
-      if (size == 0) return fallback;
-      final data = calloc<Uint8>(size);
-      try {
-        if (GetFileVersionInfo(p, 0, size, data.cast()) == 0) return fallback;
-        final trans = calloc<Pointer>();
-        final tlen = calloc<Uint32>();
-        try {
-          var lang = '040904b0';
-          if (VerQueryValue(data.cast(), r'\VarFileInfo\Translation'.toNativeUtf16(), trans, tlen) != 0 &&
-              tlen.value >= 4) {
-            final w = trans.value.cast<Uint16>();
-            lang = w[0].toRadixString(16).padLeft(4, '0') + w[1].toRadixString(16).padLeft(4, '0');
-          }
-          final q = '\\StringFileInfo\\$lang\\FileDescription'.toNativeUtf16();
-          final out = calloc<Pointer>();
-          final olen = calloc<Uint32>();
-          try {
-            if (VerQueryValue(data.cast(), q, out, olen) != 0 && olen.value > 1) {
-              final s = out.value.cast<Utf16>().toDartString().trim();
-              if (s.isNotEmpty) return s;
-            }
-          } finally {
-            calloc.free(q);
-            calloc.free(out);
-            calloc.free(olen);
-          }
-        } finally {
-          calloc.free(trans);
-          calloc.free(tlen);
-        }
-      } finally {
-        calloc.free(data);
-      }
-    } finally {
-      calloc.free(p);
-    }
-    return fallback;
-  }
+  String _displayName(String path, String exe) => using((arena) {
+        final fallback = exe.replaceFirst(RegExp(r'\.exe$', caseSensitive: false), '');
+        final file = path.toNativeUtf16(allocator: arena);
+        final size = GetFileVersionInfoSize(file, nullptr);
+        if (size == 0) return fallback;
+        final data = arena<Uint8>(size).cast<Void>();
+        if (GetFileVersionInfo(file, 0, size, data) == 0) return fallback;
 
-  IAudioSessionManager2? _mgr() {
-    if (_audio != null) return _audio;
-    try {
-      final en = MMDeviceEnumerator.createInstance();
-      final pDev = calloc<COMObject>();
-      if (en.getDefaultAudioEndpoint(0 /* eRender */, 1 /* eMultimedia */, pDev.cast()) != S_OK) return null;
-      final dev = IMMDevice(pDev);
-      final pMgr = calloc<COMObject>();
-      final iid = convertToIID(IID_IAudioSessionManager2);
-      final hr = dev.activate(iid, CLSCTX_ALL, nullptr, pMgr.cast());
-      calloc.free(iid);
-      if (hr != S_OK) return null;
-      return _audio = IAudioSessionManager2(pMgr);
-    } catch (_) {
-      return null;
-    }
+        final value = arena<Pointer>();
+        final len = arena<Uint32>();
+        var lang = '040904b0';
+        if (VerQueryValue(data, r'\VarFileInfo\Translation'.toNativeUtf16(allocator: arena), value, len) != 0 &&
+            len.value >= 4) {
+          final w = value.value.cast<Uint16>();
+          lang = w[0].toRadixString(16).padLeft(4, '0') + w[1].toRadixString(16).padLeft(4, '0');
+        }
+        final query = '\\StringFileInfo\\$lang\\FileDescription'.toNativeUtf16(allocator: arena);
+        if (VerQueryValue(data, query, value, len) != 0 && len.value > 1) {
+          final name = value.value.cast<Utf16>().toDartString().trim();
+          if (name.isNotEmpty) return name;
+        }
+        return fallback;
+      });
+
+  static String _appId(String exe) {
+    final lower = exe.toLowerCase();
+    return lower.endsWith('.exe') ? lower.substring(0, lower.length - 4) : lower;
   }
 
   @override
   Future<List<MediaApp>> playing() async {
-    final out = <MediaApp>[];
-    final mgr = _mgr();
-    if (mgr == null) return out;
-    final pEnum = calloc<COMObject>();
-    if (mgr.getSessionEnumerator(pEnum.cast()) != S_OK) {
-      _audio = null; // default device may have changed
-      return out;
+    // COM objects are created and released within this one synchronous call.
+    // They are detached from the win32 package's finalizers, which would
+    // otherwise release them a second time, possibly from another thread.
+    CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    final owned = <IUnknown>[];
+    T own<T extends IUnknown>(T o) {
+      o.detach();
+      owned.add(o);
+      return o;
     }
-    final en = IAudioSessionEnumerator(pEnum);
+
+    Pointer<COMObject> out() => calloc<COMObject>();
+    final apps = <MediaApp>[];
     final count = calloc<Int32>();
-    en.getCount(count);
-    final seen = <String>{};
-    for (var i = 0; i < count.value; i++) {
-      final pCtl = calloc<COMObject>();
-      if (en.getSession(i, pCtl.cast()) != S_OK) continue;
-      final ctl = IAudioSessionControl2.from(IAudioSessionControl(pCtl));
-      final state = calloc<Int32>();
-      final pid = calloc<Uint32>();
-      try {
-        ctl.getState(state);
+    final state = calloc<Int32>();
+    final pid = calloc<Uint32>();
+    try {
+      final devices = own(MMDeviceEnumerator.createInstance());
+      final pDevice = out();
+      if (devices.getDefaultAudioEndpoint(0 /* eRender */, 1 /* eMultimedia */, pDevice.cast()) != S_OK) {
+        free(pDevice);
+        return apps;
+      }
+      final device = own(IMMDevice(pDevice));
+      final pManager = out();
+      final iid = convertToIID(IID_IAudioSessionManager2);
+      final hr = device.activate(iid, CLSCTX_ALL, nullptr, pManager.cast());
+      free(iid);
+      if (hr != S_OK) {
+        free(pManager);
+        return apps;
+      }
+      final manager = own(IAudioSessionManager2(pManager));
+      final pSessions = out();
+      if (manager.getSessionEnumerator(pSessions.cast()) != S_OK) {
+        free(pSessions);
+        return apps;
+      }
+      final sessions = own(IAudioSessionEnumerator(pSessions));
+      sessions.getCount(count);
+      final seen = <String>{};
+      for (var i = 0; i < count.value; i++) {
+        final pSession = out();
+        if (sessions.getSession(i, pSession.cast()) != S_OK) {
+          free(pSession);
+          continue;
+        }
+        final session = own(IAudioSessionControl2.from(own(IAudioSessionControl(pSession))));
+        session.getState(state);
         if (state.value != 1 /* AudioSessionStateActive */) continue;
-        if (ctl.isSystemSoundsSession() == S_OK) continue;
-        ctl.getProcessId(pid);
+        if (session.isSystemSoundsSession() == S_OK) continue;
+        session.getProcessId(pid);
         final path = _exePath(pid.value);
         if (path == null) continue;
         final exe = path.split('\\').last;
-        final id = exe.toLowerCase().replaceAll(RegExp(r'\.exe$'), '');
-        if (seen.add(id)) out.add(MediaApp(id, _names[path] ??= _displayName(path, exe)));
-      } finally {
-        calloc.free(state);
-        calloc.free(pid);
-        ctl.release();
+        final id = _appId(exe);
+        if (seen.add(id)) apps.add(MediaApp(id, _names[path] ??= _displayName(path, exe)));
       }
+    } catch (_) {
+      // no audio device, audio service restarting, ...
+    } finally {
+      for (final o in owned.reversed) {
+        o.release();
+        free(o.ptr);
+      }
+      calloc.free(count);
+      calloc.free(state);
+      calloc.free(pid);
     }
-    calloc.free(count);
-    en.release();
-    return out;
+    return apps;
   }
 }

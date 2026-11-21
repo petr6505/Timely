@@ -44,4 +44,5 @@ Filename: "{app}\timely-agent.exe"; Flags: nowait runhidden
 Filename: "{app}\timely.exe"; Description: "Open Timely"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
+Filename: "schtasks"; Parameters: "/delete /f /tn ""Timely agent"""; Flags: runhidden; RunOnceId: "DeleteTask"
 Filename: "taskkill"; Parameters: "/F /IM timely-agent.exe"; Flags: runhidden; RunOnceId: "KillAgent"

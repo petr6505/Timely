@@ -176,12 +176,11 @@ class DesktopAgent {
       final bin = _agentBinary();
       if (bin != null) await Process.start(bin, [], mode: ProcessStartMode.detached);
     } else if (Platform.isWindows) {
+      // autostart is set up by the installer (Run key) and by the agent itself
+      // (a scheduled task), so all that's left is starting it now
       final bin = _agentBinary();
-      if (bin == null) return;
-      await _run('reg', ['add', r'HKCU\Software\Microsoft\Windows\CurrentVersion\Run', '/v', 'TimelyAgent', '/t',
-        'REG_SZ', '/d', '"$bin"', '/f']);
       final st = await status();
-      if (st.checks['background agent running'] != true) {
+      if (bin != null && st.checks['background agent running'] != true) {
         await Process.start(bin, [], mode: ProcessStartMode.detached);
       }
     }

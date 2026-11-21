@@ -15,6 +15,8 @@ class DeviceUse {
   int media = 0;
   /// App ids this device used for the merged app (e.g. package names).
   final Set<String> ids = {};
+  /// Names the app has on this device.
+  final Set<String> names = {};
 }
 
 class AppStat {
@@ -24,6 +26,9 @@ class AppStat {
   int focus = 0;
   int media = 0;
   final Map<String, DeviceUse> perDevice = {};
+  /// Base key -> name of every app counted under this one. More than one
+  /// entry means the user linked apps together.
+  final Map<String, String> members = {};
   AppStat(this.key, this.name, this.category);
 }
 
@@ -71,6 +76,9 @@ Summary summarize(Map<String, Map<String, DayChunk>> chunks, TimelySettings s, F
   final dayStats = {for (final d in daysBetween(f.fromDay, f.toDay)) d: DayStat(d)};
   sum.days.addAll(dayStats.values);
 
+  // a linked app can be guessed differently on each device, so the first guess sticks
+  final catOf = <String, String>{};
+
   chunks.forEach((deviceId, byDay) {
     if (s.hiddenDevices.contains(deviceId)) return;
     if (f.devices.isNotEmpty && !f.devices.contains(deviceId)) return;
@@ -81,8 +89,9 @@ Summary summarize(Map<String, Map<String, DayChunk>> chunks, TimelySettings s, F
       sum.unlocks += c.unlocks;
       for (var i = 0; i < c.apps.length; i++) {
         final ref = c.apps[i];
-        final key = mergeKey(ref.name, s.aliases);
-        final cat = s.categoryOf(key, ref.id, ref.name);
+        final base = baseKey(ref.name);
+        final key = s.links[base] ?? base;
+        final cat = catOf[key] ??= s.categoryOf(key, ref.id, ref.name);
         if (f.categories.isNotEmpty && !f.categories.contains(cat)) continue;
         final hf = c.hourly(i);
         final hm = c.hourly(i, media: true);
@@ -90,13 +99,15 @@ Summary summarize(Map<String, Map<String, DayChunk>> chunks, TimelySettings s, F
         final media = hm.fold(0, (a, b) => a + b);
         if (focus == 0 && media == 0) continue;
         final st = sum.apps.putIfAbsent(key, () => AppStat(key, ref.name, cat));
-        if (ref.name.length < st.name.length || st.name == st.key) st.name = ref.name;
+        final old = st.members[base];
+        if (old == null || ref.name.length < old.length) st.members[base] = ref.name;
         st.focus += focus;
         st.media += media;
         final du = st.perDevice.putIfAbsent(deviceId, DeviceUse.new);
         du.focus += focus;
         du.media += media;
         du.ids.add(ref.id);
+        du.names.add(ref.name);
         sum.focus += focus;
         sum.media += media;
         sum.categories[cat] = (sum.categories[cat] ?? 0) + focus;
@@ -112,7 +123,25 @@ Summary summarize(Map<String, Map<String, DayChunk>> chunks, TimelySettings s, F
       }
     });
   });
+  for (final a in sum.apps.values) {
+    a.name = s.appNames[a.key] ?? a.members[a.key] ?? a.members.values.reduce((x, y) => y.length < x.length ? y : x);
+  }
   return sum;
+}
+
+/// Every app in [chunks] (key -> name), for picking an app to link with.
+Map<String, String> knownApps(Map<String, Map<String, DayChunk>> chunks, TimelySettings s) {
+  final out = <String, String>{};
+  for (final byDay in chunks.values) {
+    for (final c in byDay.values) {
+      for (final ref in c.apps) {
+        final key = mergeKey(ref.name, s.links);
+        final old = out[key];
+        if (old == null || ref.name.length < old.length) out[key] = ref.name;
+      }
+    }
+  }
+  return out..updateAll((k, v) => s.appNames[k] ?? v);
 }
 
 String fmtDur(int secs, {bool short = false}) {

@@ -50,7 +50,7 @@ class Recorder {
 
   static int _sod(DateTime t) => t.hour * 3600 + t.minute * 60 + t.second;
 
-  /// Attribute [from, to) to app. [media] selects background playback track.
+  /// Counts [from, to) for the app, as background playback if [media] is set.
   void add(DateTime from, DateTime to, String id, String name, {bool media = false}) {
     var a = from;
     while (a.isBefore(to)) {

@@ -72,10 +72,17 @@ const _builtinAliases = <String, String>{
   'whatsappmessenger': 'whatsapp',
 };
 
-/// Key under which the same app is merged across devices.
-String mergeKey(String name, [Map<String, String> userAliases = const {}]) {
+/// Key that identifies an app by its name, before any links the user made.
+/// Different spellings of well known apps already end up under one key.
+String baseKey(String name) {
   var k = name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
   if (k.isEmpty) k = name.toLowerCase();
-  k = userAliases[k] ?? _builtinAliases[k] ?? k;
-  return userAliases[k] ?? k;
+  return _builtinAliases[k] ?? k;
+}
+
+/// Key under which the same app is merged across devices. [links] maps a
+/// base key to the key of the app it was linked into.
+String mergeKey(String name, [Map<String, String> links = const {}]) {
+  final k = baseKey(name);
+  return links[k] ?? k;
 }

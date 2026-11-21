@@ -134,7 +134,6 @@ class _BarsPainter extends CustomPainter {
   bool shouldRepaint(_BarsPainter old) => true;
 }
 
-/// Weekday x hour heatmap.
 class Heatmap extends StatelessWidget {
   final List<List<int>> heat;
   const Heatmap(this.heat, {super.key});
@@ -195,7 +194,6 @@ class SplitBar extends StatelessWidget {
   }
 }
 
-/// Thin proportional bar used in lists.
 class Meter extends StatelessWidget {
   final double frac;
   final Color color;

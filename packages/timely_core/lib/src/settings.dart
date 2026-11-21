@@ -7,8 +7,9 @@ class TimelySettings {
   String accent;
   String muted;
   List<CategoryDef> categories;
-  Map<String, String> appCategory; // mergeKey -> category id
-  Map<String, String> aliases; // mergeKey -> canonical mergeKey
+  Map<String, String> appCategory; // app key -> category id
+  Map<String, String> appNames; // app key -> name the user gave it
+  Map<String, String> links; // base key -> key of the app it was linked into
   Set<String> removedCategories; // default categories the user deleted
   Set<String> hiddenDevices; // device ids left out of all statistics
   int idleMinutes;
@@ -20,13 +21,15 @@ class TimelySettings {
     this.muted = '#7c776f',
     List<CategoryDef>? categories,
     Map<String, String>? appCategory,
-    Map<String, String>? aliases,
+    Map<String, String>? appNames,
+    Map<String, String>? links,
     Set<String>? removedCategories,
     Set<String>? hiddenDevices,
     this.idleMinutes = 3,
   })  : categories = categories ?? [...defaultCategories],
         appCategory = appCategory ?? {},
-        aliases = aliases ?? {},
+        appNames = appNames ?? {},
+        links = links ?? {},
         removedCategories = removedCategories ?? {},
         hiddenDevices = hiddenDevices ?? {} {
     _addMissingDefaults();
@@ -62,6 +65,31 @@ class TimelySettings {
 
   String categoryOf(String key, String appId, String name) => appCategory[key] ?? guessCategory(appId, name);
 
+  void renameApp(String key, String name) {
+    name = name.trim();
+    if (name.isEmpty) {
+      appNames.remove(key);
+    } else {
+      appNames[key] = name;
+    }
+  }
+
+  /// Counts app [from] as part of app [into] from now on, on every device.
+  /// [members] are the base keys currently making up [from].
+  void linkApp(String from, String into, Iterable<String> members) {
+    if (from == into) return;
+    for (final k in {from, ...members}) {
+      links[k] = into;
+    }
+    // apps that were linked into [from] earlier follow it
+    links.updateAll((k, v) => v == from ? into : v);
+    links.remove(into);
+    appCategory.remove(from);
+    appNames.remove(from);
+  }
+
+  void unlinkApp(String member) => links.remove(member);
+
   CategoryDef category(String id) =>
       categories.firstWhere((c) => c.id == id, orElse: () => categories.firstWhere((c) => c.id == 'other',
           orElse: () => const CategoryDef('other', 'other', '#9a8f80')));
@@ -73,7 +101,8 @@ class TimelySettings {
         'muted': muted,
         'categories': [for (final c in categories) c.toJson()],
         'appCategory': appCategory,
-        'aliases': aliases,
+        'appNames': appNames,
+        'links': links,
         'removedCategories': removedCategories.toList(),
         'hiddenDevices': hiddenDevices.toList(),
         'idleMinutes': idleMinutes,
@@ -96,7 +125,8 @@ class TimelySettings {
           ? [for (final c in j['categories'] as List) CategoryDef.fromJson(c as Map<String, dynamic>)]
           : null,
       appCategory: (j['appCategory'] as Map?)?.cast<String, String>(),
-      aliases: (j['aliases'] as Map?)?.cast<String, String>(),
+      appNames: (j['appNames'] as Map?)?.cast<String, String>(),
+      links: (j['links'] as Map?)?.cast<String, String>(),
       removedCategories: (j['removedCategories'] as List?)?.cast<String>().toSet(),
       hiddenDevices: (j['hiddenDevices'] as List?)?.cast<String>().toSet(),
       idleMinutes: (j['idleMinutes'] as num?)?.toInt() ?? d.idleMinutes,

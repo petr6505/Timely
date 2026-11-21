@@ -3,7 +3,7 @@ import 'package:dbus/dbus.dart';
 import 'probe.dart';
 
 /// GNOME on Wayland: focus via the timely-focus shell extension,
-/// media via MPRIS, idle via the extension (Mutter idle monitor fallback).
+/// media via MPRIS, idle time also comes from the extension.
 class LinuxProbe extends Probe {
   final DBusClient _bus = DBusClient.session();
   bool _extOk = false;
@@ -32,22 +32,6 @@ class LinuxProbe extends Probe {
     }
   }
 
-  /// Idle time without the extension (screen-time can't be attributed, but
-  /// we still know whether the user is present).
-  Future<int?> idleFallback() async {
-    try {
-      final r = await _bus.callMethod(
-        destination: 'org.gnome.Mutter.IdleMonitor',
-        path: DBusObjectPath('/org/gnome/Mutter/IdleMonitor/Core'),
-        interface: 'org.gnome.Mutter.IdleMonitor',
-        name: 'GetIdletime',
-        replySignature: DBusSignature('t'),
-      );
-      return r.values.first.asUint64();
-    } catch (_) {
-      return null;
-    }
-  }
 
   final Map<String, MediaApp> _identity = {};
 

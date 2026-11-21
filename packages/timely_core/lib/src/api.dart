@@ -77,7 +77,9 @@ class TimelyApi {
       req.headers['content-type'] = 'application/octet-stream';
       req.bodyBytes = bytes;
     }
-    final res = await http.Response.fromStream(await _c.send(req).timeout(const Duration(seconds: 30)));
+    // the timeout covers the body too; a connection that dies mid-response
+    // (e.g. the laptop went to sleep) would otherwise hang the agent's sync forever
+    final res = await _c.send(req).then(http.Response.fromStream).timeout(const Duration(seconds: 45));
     dynamic body;
     try {
       body = jsonDecode(res.body);

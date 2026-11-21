@@ -11,7 +11,8 @@ I wanted to see how much time I actually spend on screens, all of them, not just
 - **Any number of devices.** Add one by scanning a QR code or opening a one-time link from a device that is already set up.
 - **Dashboard on every device.** Filter by device and category. It has stacked daily, hourly and weekly charts, a weekday × hour heatmap, and an app list where every app expands into a per-device breakdown.
 - **Works offline.** Devices keep recording without a connection and upload the backlog when they're back online.
-- **Synced settings.** Theme colours, category colours and app categories change on every device at once.
+- **Same app, different names.** Apps are matched across devices by name. When they're named differently ("Brave" on the phone, "Brave Web Browser" on the laptop), open one in the app list and use *link with…* to count them as one. Any app can also be renamed.
+- **Synced settings.** Theme colours, category colours, app categories, names and links change on every device at once.
 - **Long history, small footprint.** A typical day is 1–3 KB per device. Days older than 90 days are compacted into hourly totals and kept forever.
 - **Private by default.** Window titles and URLs are never collected, only which app was in front and for how long.
 
@@ -65,7 +66,7 @@ sudo apt install ./timely_*_amd64.deb
 
 Log out and back in once so GNOME loads the focus extension, then open Timely and sign in. The agent starts automatically.
 
-**Windows 11:** run `timely-setup-*.exe`. It installs per-user without admin rights, and the agent runs in the background from login.
+**Windows 11:** run `timely-setup-*.exe`. It installs per-user without admin rights, and the agent runs in the background from login. A scheduled task (*Timely agent*) starts it again within 5 minutes if it ever stops. If tracking still has gaps, `%LOCALAPPDATA%\Timely\agent.log` says why.
 
 ### Adding a device
 

@@ -4,7 +4,6 @@ import 'package:timely_core/timely_core.dart';
 Color hex(String s) => Color(int.parse(s.substring(1), radix: 16) | 0xFF000000);
 String toHex(Color c) => '#${(c.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
 
-/// Resolved palette for the current settings.
 class Palette {
   final Color bg, fg, accent, muted, line, surface;
   Palette(TimelySettings s)
